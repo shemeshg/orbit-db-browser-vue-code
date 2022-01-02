@@ -1,65 +1,152 @@
 <template>
   <div class="hello">
-    <h1>{{ msg }}</h1>
-    <p>
-      For a guide and recipes on how to configure / customize this project,<br>
-      check out the
-      <a href="https://cli.vuejs.org" target="_blank" rel="noopener">vue-cli documentation</a>.
-    </p>
-    <h3>Installed CLI Plugins</h3>
-    <ul>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-babel" target="_blank" rel="noopener">babel</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-pwa" target="_blank" rel="noopener">pwa</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-router" target="_blank" rel="noopener">router</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-vuex" target="_blank" rel="noopener">vuex</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-eslint" target="_blank" rel="noopener">eslint</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-unit-mocha" target="_blank" rel="noopener">unit-mocha</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-typescript" target="_blank" rel="noopener">typescript</a></li>
-    </ul>
-    <h3>Essential Links</h3>
-    <ul>
-      <li><a href="https://vuejs.org" target="_blank" rel="noopener">Core Docs</a></li>
-      <li><a href="https://forum.vuejs.org" target="_blank" rel="noopener">Forum</a></li>
-      <li><a href="https://chat.vuejs.org" target="_blank" rel="noopener">Community Chat</a></li>
-      <li><a href="https://twitter.com/vuejs" target="_blank" rel="noopener">Twitter</a></li>
-      <li><a href="https://news.vuejs.org" target="_blank" rel="noopener">News</a></li>
-    </ul>
-    <h3>Ecosystem</h3>
-    <ul>
-      <li><a href="https://router.vuejs.org" target="_blank" rel="noopener">vue-router</a></li>
-      <li><a href="https://vuex.vuejs.org" target="_blank" rel="noopener">vuex</a></li>
-      <li><a href="https://github.com/vuejs/vue-devtools#vue-devtools" target="_blank" rel="noopener">vue-devtools</a></li>
-      <li><a href="https://vue-loader.vuejs.org" target="_blank" rel="noopener">vue-loader</a></li>
-      <li><a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">awesome-vue</a></li>
-    </ul>
+    <a href="https://github.com/orbitdb/orbit-db" class="github-corner" aria-label="View source on Github"/>
+
+    <div id="logo">
+      <pre>
+                 _     _ _         _ _     
+                | |   (_) |       | | |    
+       ___  _ __| |__  _| |_    __| | |__  
+      / _ \| '__| '_ \| | __|  / _\` | '_\ 
+     | (_) | |  | |_) | | |_  | (_| | |_) |
+      \___/|_|  |_.__/|_|\__|  \__,_|_.__/ 
+
+     Peer-to-Peer Database for the Decentralized Web
+     <a href="https://github.com/orbitdb/orbit-db" target="_blank">https://github.com/orbitdb/orbit-db</a>
+      </pre>
+    </div>
+    <h2>Open or Create Local Database</h2>
+    <i>Open a database locally and create it if the database doesn't exist.</i>
+    <br><br>
+    <input v-model="dbname" type="text" placeholder="Database name"/>
+    <button @click="createDb" type="button" :disabled="isCreateDbDisabled" >Open</button>
+    <select v-model="dbType">
+      <option value="eventlog">Eventlog</option>
+      <option value="feed">Feed</option>
+      <option value="keyvalue">Key-Value</option>
+      <option value="docstore">DocumentDB</option>
+      <option value="counter">Counter</option>
+    </select>
+    <input v-model="isDbPublic" type="checkbox" > Public
+
+    <h2>Open Remote Database</h2>
+    <i>Open a database from an OrbitDB address, eg. /orbitdb/QmfY3udPcWUD5NREjrUV351Cia7q4DXNcfyRLJzUPL3wPD/hello</i>
+    <br>
+    <i><b>Note!</b> Open the remote database in an Incognito Window or in a different browser. It won't work if you don't.</i>
+    <br><br>
+    <input v-model="dbaddress" type="text" placeholder="Address"/>
+    <button @click="openDb" type="button" :disabled="isOpenDbDisabled">Open</button>
+    <input v-model="isOpenReadOnly" type="checkbox"> Read-only
+    <br><br>
+    <div>{{status}}</div>
+    <div>
+      <header id="output-header">{{outputHeaderElmText}}</header>
+      <div id="output">{{outputElmText}}</div>
+    </div>
+    <div id="writerText">{{writerText}}</div>    
+
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, ref, onMounted } from 'vue';
+import { example} from "./example"
 
 export default defineComponent({
   name: 'HelloWorld',
   props: {
     msg: String,
   },
+  setup(){
+    const outputHeaderElmText=ref("")
+    const outputElmText=ref("")
+    const writerText=ref("")
+
+    const status=ref("Starting IPFS...")
+    const dbname=ref("")
+    const dbType=ref("eventlog")
+    const isDbPublic=ref(true)
+    const isCreateDbDisabled=ref(true)
+    const isOpenDbDisabled=ref(true)
+    const isOpenReadOnly=ref(true)
+    const createDb=()=>{
+      isCreateDbDisabled.value=true
+      isOpenDbDisabled.value=true
+      
+      outputHeaderElmText.value=""
+      outputElmText.value=""
+      writerText.value=""
+    }
+
+    const dbaddress=ref("")
+    const openDb=()=>{
+      console.log(`clicked ${dbaddress.value}`)
+    }
+
+    const doOnMounted = async ()=>{
+      await example.doConnect()
+      isCreateDbDisabled.value=false
+      isOpenDbDisabled.value=false
+      status.value="IPFS Started"
+    }
+    onMounted(doOnMounted)
+
+    return {dbname,createDb, dbType, isDbPublic, isCreateDbDisabled, openDb, isOpenDbDisabled,
+          isOpenReadOnly, status, outputHeaderElmText, outputElmText, writerText}  
+  }
 });
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped lang="scss">
+.hello {
+  font-family: 'Abel', sans-serif;
+  font-size: 0.8em;
+}
+
+#logo {
+  border-top: 1px dotted black;
+  border-bottom: 1px dotted black;
+}
+
+#status {
+  border-top: 1px dotted black;
+  border-bottom: 1px dotted black;
+  padding: 0.5em 0em;
+  text-align: center;
+}
+
+#results {
+  border: 1px dotted black;
+  padding: 0.5em;
+}
+
+#output-header > p {
+  margin: 0;
+  font-style: italic;
+}
+
+#output {
+  padding-top: 1em;
+}
+
+#writerText {
+  padding-top: 0.5em;
+}
+
+pre {
+  text-align: center;
+}
+
+input {
+  padding: 0.5em;
+}
+
+h2 {
+  margin-bottom: 0.2em;
+}
 h3 {
-  margin: 40px 0 0;
-}
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-li {
-  display: inline-block;
-  margin: 0 10px;
-}
-a {
-  color: #42b983;
+  margin-top: 0.8em;
+  margin-bottom: 0.2em;
 }
 </style>
