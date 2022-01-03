@@ -43,14 +43,14 @@
       <header id="output-header">{{outputHeaderElmText}}</header>
       <div id="output">{{outputElmText}}</div>
     </div>
-    <div id="writerText">{{writerText}}</div>    
+    <p v-for="(item, idx) in writerText" v-bind:key="idx">{{item}}</p>    
 
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from 'vue';
-import { example} from "./example"
+import { example, IntevalSchedualer} from "./example"
 
 export default defineComponent({
   name: 'HelloWorld',
@@ -60,7 +60,7 @@ export default defineComponent({
   setup(){
     const outputHeaderElmText=ref("")
     const outputElmText=ref("")
-    const writerText=ref("")
+    const writerText=ref([])
 
     const status=ref("Starting IPFS...")
     const dbname=ref("")
@@ -69,13 +69,41 @@ export default defineComponent({
     const isCreateDbDisabled=ref(true)
     const isOpenDbDisabled=ref(true)
     const isOpenReadOnly=ref(true)
-    const createDb=()=>{
+
+    let intevalSchedualer:IntevalSchedualer
+    const createDb=async ()=>{
       isCreateDbDisabled.value=true
       isOpenDbDisabled.value=true
       
       outputHeaderElmText.value=""
       outputElmText.value=""
-      writerText.value=""
+      writerText.value=[]
+
+      if (intevalSchedualer){
+        intevalSchedualer.stop()
+      }
+      
+      const dbstore= await example.getCreateDatabase(dbname.value, dbType.value, isDbPublic.value,(s:unknown)=>{
+        // eslint-disable-next-line 
+        const anyS = s as any
+        if (anyS.newData){
+          writerText.value = anyS.queryData.result
+        } else {
+          status.value=anyS.status
+        }
+        console.log(s)
+      })
+      status.value="Store created"
+      await dbstore.loadStore()
+      status.value="Store loaded"
+      intevalSchedualer=new IntevalSchedualer(dbstore);
+      intevalSchedualer.start()
+      status.value="intevalSchedualer storing dummy data"
+      outputHeaderElmText.value=`${dbstore.storeType} created`
+      outputElmText.value=`Try openning ${dbstore.storeAddress} from Incognito window ot other browser`
+
+      isCreateDbDisabled.value=false
+      isOpenDbDisabled.value=false
     }
 
     const dbaddress=ref("")
@@ -92,7 +120,7 @@ export default defineComponent({
     onMounted(doOnMounted)
 
     return {dbname,createDb, dbType, isDbPublic, isCreateDbDisabled, openDb, isOpenDbDisabled,
-          isOpenReadOnly, status, outputHeaderElmText, outputElmText, writerText}  
+          isOpenReadOnly, status, outputHeaderElmText, outputElmText, writerText, dbaddress}  
   }
 });
 </script>

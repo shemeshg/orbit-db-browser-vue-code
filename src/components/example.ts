@@ -1,21 +1,21 @@
 import * as IPFS from "ipfs";
 import OrbitDB from "orbit-db";
+import Store from "orbit-db-store"
 
 class Example {
   ipfs?: IPFS.IPFS
   orbitdb?: OrbitDB;
 
-  async doConnect(){
+  async doConnect() {
     // Create IPFS instance
     this.ipfs = await IPFS.create({
       repo: '/orbitdb/examples/browser/new/ipfs/0.33.1',
       start: true,
-      preload: { 
+      preload: {
         enabled: false
       },
       EXPERIMENTAL: {
-        //pubsub: true,
-        ipnsPubsub: true
+        pubsub: true,
       },
       config: {
         Addresses: {
@@ -34,8 +34,210 @@ class Example {
       }
     })
     this.orbitdb = await OrbitDB.createInstance(this.ipfs)
-    
+
+  }
+
+  async getCreateDatabase(name: string, type: TStoreType, publicAccess: boolean,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    statusText = (s: unknown) => { return; }) {
+
+    const dbStore = new DbStore(this, statusText)
+    await dbStore.createStore(name, type, publicAccess)
+    return dbStore
   }
 }
+
+class DbStore {
+  orbitdb: OrbitDB;
+  store?: Store
+  statusFnc: (s: { queryData: unknown, status: string, newData: boolean  }) => void
+  ipfs: IPFS.IPFS
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars 
+  constructor(example: Example, statusFnc = (s: { queryData: unknown, status: string, newData: boolean  }) => { return; }) {
+    if (!example.orbitdb || !example.ipfs) { throw new Error("No this.orbitdb instance") }
+    this.orbitdb = example.orbitdb
+    this.ipfs = example.ipfs
+    this.statusFnc = statusFnc
+  }
+  async createStore(name: string, type: TStoreType, publicAccess: boolean) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orbitIdentityId = (this.orbitdb as any).identity.id
+    const params = {
+      // If database doesn't exist, create it
+      create: true,
+      overwrite: true,
+      // Load only the local version of the database, 
+      // don't load the latest from the network yet
+      localOnly: false,
+      type: type,
+      // If "Public" flag is set, allow anyone to write to the database,
+      // otherwise only the creator of the database can write      
+      accessController: {
+        write: publicAccess ? ['*'] : [orbitIdentityId],
+      }
+    }
+    this.store = await this.orbitdb.open(name, params)
+  }
+
+  get storeType() {
+    return this.store?.type
+  }
+
+  get storeAddress() {
+    return this.store?.address.toString();
+  }
+
+  private queryTest() {
+    if (!this.store) { throw new Error("No this.store instance") }
+    if (this.store.type === 'eventlog')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (this.store as any).iterator({ limit: 5 }).collect()
+    else if (this.store.type === 'feed')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (this.store as any).iterator({ limit: 5 }).collect()
+    else if (this.store.type === 'docstore')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (this.store as any).get('peer1')
+    else if (this.store.type === 'keyvalue')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (this.store as any).get('mykey')
+    else if (this.store.type === 'counter')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (this.store as any).value
+    else
+      throw new Error(`Unknown datatbase type:  ${this.store.type}`)
+
+  }
+
+  private async queryAndRender() {
+    if (!this.store) { throw new Error("No this.store instance") }
+    const networkPeers = await this.ipfs.swarm.peers()
+    const databasePeers = await this.ipfs.pubsub.peers(this.store.address.toString())
+
+    const result = this.queryTest()
+    const statusToReport = {
+      storeType: this.storeType, storeAddress: this.storeAddress, orbitid: this.orbitdb.id,
+      databasePerNetwork: databasePeers.length / networkPeers.length,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      oplogUpper: Math.max((this.store as any)._replicationStatus.progress, (this.store as any)._oplog.length),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      oplogLower: (this.store as any)._replicationStatus.max,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      result: result.slice().reverse().map((e: any) => e.payload.value)
+    }
+
+    this.statusFnc({ queryData: statusToReport, status: "", newData: true  });
+  }
+
+  async loadStore() {
+    if (!this.store) { throw new Error("No this.store instance") }
+    // When the database is ready (ie. loaded), display results
+    this.store.events.on('ready', () => this.queryAndRender())
+    // When database gets replicated with a peer, display results
+    this.store.events.on('replicated', () => this.queryAndRender())
+    // When we update the database, display result
+    this.store.events.on('write', () => this.queryAndRender())
+
+    this.store.events.on('replicate.progress', () => this.queryAndRender())
+
+    // Hook up to the load progress event and render the progress
+    let maxTotal = 0
+    this.store.events.on('load.progress', (address, hash, entry, progress, total) => {
+      maxTotal = Math.max.apply(null, [maxTotal, progress, 0])
+      total = Math.max.apply(null, [progress, maxTotal, total, entry.clock.time, 0])
+      this.statusFnc({ queryData: {}, status: `Loading database... ${maxTotal} / ${total}`, newData: false });
+    })
+
+    this.store.events.on('ready', () => {
+      // Set the status text
+      setTimeout(() => {
+        this.statusFnc({ queryData: {}, status:'Database is ready', newData: false });
+      }, 1000)
+    })
+
+    // Load locally persisted database
+    await this.store.load()
+  }
+
+  
+
+  async resetStore() {
+    await this.store?.close()
+  }
+}
+
+export class IntevalSchedualer {
+  updateInterval?: NodeJS.Timeout
+  interval?: number
+  count = 0
+  dbstore: DbStore
+  constructor(dbstore: DbStore) {
+    this.dbstore=dbstore
+    this.resetIntervalTime();
+  }
+  private resetIntervalTime() {
+    this.interval = Math.floor((Math.random() * 300) + (Math.random() * 2000))
+  }
+
+  start(): void{
+    // Start update/insert loop
+    this.updateInterval = setInterval(async () => {
+      try {
+        await this.dummyInsert()
+      } catch (e) {
+        console.error(e)        
+        if (this.updateInterval) {
+          clearInterval(this.updateInterval)
+        }
+      }
+    }, this.interval)
+  }
+
+  private async dummyInsert(): Promise<void>{
+    const creatures = [
+      '🐙', '🐷', '🐬', '🐞', 
+      '🐈', '🙉', '🐸', '🐓',
+      '🐊', '🕷', '🐠', '🐘',
+      '🐼', '🐰', '🐶', '🐥'
+    ]
+    const time = new Date().toISOString()
+    const idx = Math.floor(Math.random() * creatures.length)
+    const creature = creatures[idx]
+    this.count++
+    
+    if (this.dbstore.store?.type === 'eventlog') {
+      const value = "GrEEtinGs from " + this.dbstore.orbitdb.id + " " + creature + ": Hello #" + this.count + " (" + time + ")"
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (this.dbstore.store as any).add(value)
+    } else if (this.dbstore.store?.type  === 'feed') {
+      const value = "GrEEtinGs from " + this.dbstore.orbitdb.id + " " + creature + ": Hello #" + this.count + " (" + time + ")"
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (this.dbstore.store as any).add(value)
+    } else if (this.dbstore.store?.type  === 'docstore') {
+      const value = { _id: 'peer1', avatar: creature, updated: time }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (this.dbstore.store as any).put(value)
+    } else if (this.dbstore.store?.type  === 'keyvalue') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (this.dbstore.store as any).set('mykey', creature)
+    } else if (this.dbstore.store?.type  === 'counter') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (this.dbstore.store as any).inc(1)
+    } else {
+      throw new Error(`Unknown datatbase type:  ${this.dbstore.store?.type}`)
+    }
+  }
+
+  stop(): void {
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval)
+    }
+    this.dbstore.resetStore();
+    this.interval = Math.floor((Math.random() * 300) + (Math.random() * 2000))
+  }
+}
+
+
 
 export const example = new Example()
