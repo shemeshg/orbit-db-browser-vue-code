@@ -50,7 +50,8 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from 'vue';
-import { ipfsRepo} from "./IpfsRepo"
+import { ipfsRepo } from "./IpfsOrbitRepo"
+import {DummyStore} from "./DummyStore"
 import { IntevalSchedualer } from "./IntevalSchedualer"
 
 export default defineComponent({
@@ -95,7 +96,9 @@ export default defineComponent({
         intevalSchedualer.stop()
       }
       
-      const dbstore= await ipfsRepo.getCreateDatabase(dbname.value, dbType.value, isDbPublic.value,callbackFunction)
+      const dbstore = new DummyStore(ipfsRepo, callbackFunction)
+      await dbstore.createStore(dbname.value, dbType.value, isDbPublic.value)
+
       status.value="Store created"
       await dbstore.loadStore()
       status.value="Store loaded"
@@ -121,8 +124,8 @@ export default defineComponent({
       if (intevalSchedualer){
         intevalSchedualer.stop()
       }
-      
-      const dbstore= await ipfsRepo.getOpenDatabase(dbaddress.value,callbackFunction)
+      const dbstore = new DummyStore(ipfsRepo, callbackFunction)
+      await dbstore.openStore(dbaddress.value)
       status.value="Store created"
       await dbstore.loadStore()
       status.value="Store loaded"

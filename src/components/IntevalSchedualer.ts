@@ -1,4 +1,4 @@
-import {DbStore} from "./IpfsRepo"
+import {DbStore} from "./IpfsOrbitRepo"
 export class IntevalSchedualer {
   updateInterval?: NodeJS.Timeout
   interval?: number
