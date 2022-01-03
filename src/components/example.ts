@@ -39,11 +39,19 @@ class Example {
 
   async getCreateDatabase(name: string, type: TStoreType, publicAccess: boolean,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    statusText = (s: unknown) => { return; }) {
+    statusFnc = (s: unknown) => { return; }) {
 
-    const dbStore = new DbStore(this, statusText)
+    const dbStore = new DbStore(this, statusFnc)
     await dbStore.createStore(name, type, publicAccess)
     return dbStore
+  }
+
+  async getOpenDatabase(address: string,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        statusFnc = (s: unknown) => { return; }) {
+    const dbStore = new DbStore(this, statusFnc)          
+    await dbStore.openStore(address)
+    return dbStore    
   }
 }
 
@@ -60,6 +68,14 @@ class DbStore {
     this.ipfs = example.ipfs
     this.statusFnc = statusFnc
   }
+
+  async openStore(address: string){
+    const params = {
+      sync: true 
+    } as IOpenOptions
+    this.store = await this.orbitdb.open(address, params)
+  }
+
   async createStore(name: string, type: TStoreType, publicAccess: boolean) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const orbitIdentityId = (this.orbitdb as any).identity.id
@@ -205,7 +221,7 @@ export class IntevalSchedualer {
     const idx = Math.floor(Math.random() * creatures.length)
     const creature = creatures[idx]
     this.count++
-    
+
     if (this.dbstore.store?.type === 'eventlog') {
       const value = "GrEEtinGs from " + this.dbstore.orbitdb.id + " " + creature + ": Hello #" + this.count + " (" + time + ")"
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

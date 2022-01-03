@@ -70,6 +70,17 @@ export default defineComponent({
     const isOpenDbDisabled=ref(true)
     const isOpenReadOnly=ref(true)
 
+    const callbackFunction = (s:unknown)=>{
+        // eslint-disable-next-line 
+        const anyS = s as any
+        if (anyS.newData){
+          writerText.value = anyS.queryData.result
+        } else {
+          status.value=anyS.status
+        }
+        console.log(s)
+      }
+
     let intevalSchedualer:IntevalSchedualer
     const createDb=async ()=>{
       isCreateDbDisabled.value=true
@@ -83,16 +94,7 @@ export default defineComponent({
         intevalSchedualer.stop()
       }
       
-      const dbstore= await example.getCreateDatabase(dbname.value, dbType.value, isDbPublic.value,(s:unknown)=>{
-        // eslint-disable-next-line 
-        const anyS = s as any
-        if (anyS.newData){
-          writerText.value = anyS.queryData.result
-        } else {
-          status.value=anyS.status
-        }
-        console.log(s)
-      })
+      const dbstore= await example.getCreateDatabase(dbname.value, dbType.value, isDbPublic.value,callbackFunction)
       status.value="Store created"
       await dbstore.loadStore()
       status.value="Store loaded"
@@ -107,8 +109,36 @@ export default defineComponent({
     }
 
     const dbaddress=ref("")
-    const openDb=()=>{
-      console.log(`clicked ${dbaddress.value}`)
+    const openDb=async ()=>{
+      isCreateDbDisabled.value=true
+      isOpenDbDisabled.value=true
+      
+      outputHeaderElmText.value=""
+      outputElmText.value=""
+      writerText.value=[]
+
+      if (intevalSchedualer){
+        intevalSchedualer.stop()
+      }
+      
+      const dbstore= await example.getOpenDatabase(dbaddress.value,callbackFunction)
+      status.value="Store created"
+      await dbstore.loadStore()
+      status.value="Store loaded"
+      if (isOpenReadOnly.value){
+        status.value="Listening for remote data"
+      } else {
+        intevalSchedualer=new IntevalSchedualer(dbstore);
+        intevalSchedualer.start()
+        status.value="intevalSchedualer storing dummy data"
+      }
+
+      outputHeaderElmText.value=`${dbstore.storeType} opened`
+      outputElmText.value=`Compare this window to the window where Db was created`
+
+      isCreateDbDisabled.value=false
+      isOpenDbDisabled.value=false
+
     }
 
     const doOnMounted = async ()=>{
