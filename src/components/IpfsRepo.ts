@@ -2,7 +2,7 @@ import * as IPFS from "ipfs";
 import OrbitDB from "orbit-db";
 import Store from "orbit-db-store"
 
-class Example {
+class IpfsRepo {
   ipfs?: IPFS.IPFS
   orbitdb?: OrbitDB;
 
@@ -55,28 +55,28 @@ class Example {
   }
 }
 
-class DbStore {
+export class DbStore {
   orbitdb: OrbitDB;
   store?: Store
   statusFnc: (s: { queryData: unknown, status: string, newData: boolean  }) => void
   ipfs: IPFS.IPFS
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars 
-  constructor(example: Example, statusFnc = (s: { queryData: unknown, status: string, newData: boolean  }) => { return; }) {
+  constructor(example: IpfsRepo, statusFnc = (s: { queryData: unknown, status: string, newData: boolean  }) => { return; }) {
     if (!example.orbitdb || !example.ipfs) { throw new Error("No this.orbitdb instance") }
     this.orbitdb = example.orbitdb
     this.ipfs = example.ipfs
     this.statusFnc = statusFnc
   }
 
-  async openStore(address: string){
+  async openStore(address: string): Promise<void>{
     const params = {
       sync: true 
     } as IOpenOptions
     this.store = await this.orbitdb.open(address, params)
   }
 
-  async createStore(name: string, type: TStoreType, publicAccess: boolean) {
+  async createStore(name: string, type: TStoreType, publicAccess: boolean): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const orbitIdentityId = (this.orbitdb as any).identity.id
     const params = {
@@ -96,11 +96,11 @@ class DbStore {
     this.store = await this.orbitdb.open(name, params)
   }
 
-  get storeType() {
+  get storeType(): string | undefined {
     return this.store?.type
   }
 
-  get storeAddress() {
+  get storeAddress(): string | undefined {
     return this.store?.address.toString();
   }
 
@@ -146,7 +146,7 @@ class DbStore {
     this.statusFnc({ queryData: statusToReport, status: "", newData: true  });
   }
 
-  async loadStore() {
+  async loadStore(): Promise<void> {
     if (!this.store) { throw new Error("No this.store instance") }
     // When the database is ready (ie. loaded), display results
     this.store.events.on('ready', () => this.queryAndRender())
@@ -178,82 +178,12 @@ class DbStore {
 
   
 
-  async resetStore() {
+  async resetStore(): Promise<void> {
     await this.store?.close()
   }
 }
 
-export class IntevalSchedualer {
-  updateInterval?: NodeJS.Timeout
-  interval?: number
-  count = 0
-  dbstore: DbStore
-  constructor(dbstore: DbStore) {
-    this.dbstore=dbstore
-    this.resetIntervalTime();
-  }
-  private resetIntervalTime() {
-    this.interval = Math.floor((Math.random() * 300) + (Math.random() * 2000))
-  }
-
-  start(): void{
-    // Start update/insert loop
-    this.updateInterval = setInterval(async () => {
-      try {
-        await this.dummyInsert()
-      } catch (e) {
-        console.error(e)        
-        if (this.updateInterval) {
-          clearInterval(this.updateInterval)
-        }
-      }
-    }, this.interval)
-  }
-
-  private async dummyInsert(): Promise<void>{
-    const creatures = [
-      '🐙', '🐷', '🐬', '🐞', 
-      '🐈', '🙉', '🐸', '🐓',
-      '🐊', '🕷', '🐠', '🐘',
-      '🐼', '🐰', '🐶', '🐥'
-    ]
-    const time = new Date().toISOString()
-    const idx = Math.floor(Math.random() * creatures.length)
-    const creature = creatures[idx]
-    this.count++
-
-    if (this.dbstore.store?.type === 'eventlog') {
-      const value = "GrEEtinGs from " + this.dbstore.orbitdb.id + " " + creature + ": Hello #" + this.count + " (" + time + ")"
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (this.dbstore.store as any).add(value)
-    } else if (this.dbstore.store?.type  === 'feed') {
-      const value = "GrEEtinGs from " + this.dbstore.orbitdb.id + " " + creature + ": Hello #" + this.count + " (" + time + ")"
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (this.dbstore.store as any).add(value)
-    } else if (this.dbstore.store?.type  === 'docstore') {
-      const value = { _id: 'peer1', avatar: creature, updated: time }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (this.dbstore.store as any).put(value)
-    } else if (this.dbstore.store?.type  === 'keyvalue') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (this.dbstore.store as any).set('mykey', creature)
-    } else if (this.dbstore.store?.type  === 'counter') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (this.dbstore.store as any).inc(1)
-    } else {
-      throw new Error(`Unknown datatbase type:  ${this.dbstore.store?.type}`)
-    }
-  }
-
-  stop(): void {
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval)
-    }
-    this.dbstore.resetStore();
-    this.interval = Math.floor((Math.random() * 300) + (Math.random() * 2000))
-  }
-}
 
 
 
-export const example = new Example()
+export const ipfsRepo = new IpfsRepo()

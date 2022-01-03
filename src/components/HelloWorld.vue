@@ -50,7 +50,8 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from 'vue';
-import { example, IntevalSchedualer} from "./example"
+import { ipfsRepo} from "./IpfsRepo"
+import { IntevalSchedualer } from "./IntevalSchedualer"
 
 export default defineComponent({
   name: 'HelloWorld',
@@ -94,7 +95,7 @@ export default defineComponent({
         intevalSchedualer.stop()
       }
       
-      const dbstore= await example.getCreateDatabase(dbname.value, dbType.value, isDbPublic.value,callbackFunction)
+      const dbstore= await ipfsRepo.getCreateDatabase(dbname.value, dbType.value, isDbPublic.value,callbackFunction)
       status.value="Store created"
       await dbstore.loadStore()
       status.value="Store loaded"
@@ -121,7 +122,7 @@ export default defineComponent({
         intevalSchedualer.stop()
       }
       
-      const dbstore= await example.getOpenDatabase(dbaddress.value,callbackFunction)
+      const dbstore= await ipfsRepo.getOpenDatabase(dbaddress.value,callbackFunction)
       status.value="Store created"
       await dbstore.loadStore()
       status.value="Store loaded"
@@ -142,7 +143,7 @@ export default defineComponent({
     }
 
     const doOnMounted = async ()=>{
-      await example.doConnect()
+      await ipfsRepo.doConnect()
       isCreateDbDisabled.value=false
       isOpenDbDisabled.value=false
       status.value="IPFS Started"
