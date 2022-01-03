@@ -47,10 +47,10 @@ export abstract class DbStore {
   ipfs: IPFS.IPFS
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars 
-  constructor(example: IpfsOrbitRepo, statusFnc = (s: { queryData: unknown, status: string, newData: boolean  }) => { return; }) {
-    if (!example.orbitdb || !example.ipfs) { throw new Error("No this.orbitdb instance") }
-    this.orbitdb = example.orbitdb
-    this.ipfs = example.ipfs
+  constructor(ipfsOrbitRepo: IpfsOrbitRepo, statusFnc = (s: { queryData: unknown, status: string, newData: boolean  }) => { return; }) {
+    if (!ipfsOrbitRepo.orbitdb || !ipfsOrbitRepo.ipfs) { throw new Error("No this.orbitdb instance") }
+    this.orbitdb = ipfsOrbitRepo.orbitdb
+    this.ipfs = ipfsOrbitRepo.ipfs
     this.statusFnc = statusFnc
   }
 
